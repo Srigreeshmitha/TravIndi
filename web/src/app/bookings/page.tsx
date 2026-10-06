@@ -1,0 +1,199 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { RequireAuth } from "@/components/RequireAuth";
+import { useAuth, isApiError } from "@/lib/auth-context";
+import { api, type Booking } from "@/lib/api";
+import { QrTicket } from "@/components/QrTicket";
+import { TicketIcon } from "@/components/icons";
+import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
+
+function statusTone(status: string) {
+  if (status === "CONFIRMED") return "bg-success/10 text-success";
+  if (status === "CANCELLED") return "bg-danger/10 text-danger";
+  return "bg-surface-muted text-foreground/60";
+}
+
+function BookingCard({ booking, onCancelled }: { booking: Booking; onCancelled: (b: Booking) => void }) {
+  const { token } = useAuth();
+  const [expanded, setExpanded] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function onCancel() {
+    if (!token) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const updated = await api.cancelBooking(booking.id, token);
+      onCancelled(updated);
+      setConfirming(false);
+    } catch (err) {
+      setError(isApiError(err) ? err.message : "Could not cancel this booking.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <li className="rounded-2xl border border-border bg-surface p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-medium">{booking.service_name}</div>
+          <Link href={`/businesses/${booking.business_id}`} className="text-sm text-foreground/60 hover:text-primary">
+            {booking.business_name}
+          </Link>
+          <div className="mt-1 text-sm text-foreground/60">
+            {new Date(booking.starts_at).toLocaleString(undefined, {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+            {" · "}Party of {booking.party_size}
+          </div>
+        </div>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium uppercase ${statusTone(booking.status)}`}>
+          {booking.status}
+        </span>
+      </div>
+
+      {booking.total_amount != null && (
+        <p className="mt-2 text-sm text-foreground/70">
+          {booking.currency} {booking.total_amount}{" "}
+          <span className="text-xs text-foreground/55">(bookkeeping only — no real payment charged)</span>
+        </p>
+      )}
+      {booking.notes && <p className="mt-1 text-xs text-foreground/55">Note: {booking.notes}</p>}
+
+      <div className="mt-3 flex items-center gap-3">
+        {booking.ticket && booking.status === "CONFIRMED" && (
+          <button onClick={() => setExpanded((v) => !v)} className="flex items-center gap-1.5 text-sm font-medium text-primary">
+            <TicketIcon width={15} height={15} />
+            {expanded ? "Hide ticket" : "Show ticket"}
+          </button>
+        )}
+        {booking.status === "CONFIRMED" &&
+          (confirming ? (
+            <span className="flex items-center gap-2 text-sm">
+              <span className="text-foreground/60">Cancel this booking?</span>
+              <button onClick={onCancel} disabled={busy} className="font-medium text-danger disabled:opacity-50">
+                {busy ? "Cancelling…" : "Yes, cancel"}
+              </button>
+              <button onClick={() => setConfirming(false)} className="text-foreground/50">
+                No
+              </button>
+            </span>
+          ) : (
+            <button onClick={() => setConfirming(true)} className="text-sm text-danger">
+              Cancel
+            </button>
+          ))}
+      </div>
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+      {expanded && booking.ticket && (
+        <div className="mt-3 flex justify-center">
+          <QrTicket token={booking.ticket.qr_token} />
+        </div>
+      )}
+    </li>
+  );
+}
+
+function BookingsList() {
+  const { token } = useAuth();
+  const [bookings, setBookings] = useState<Booking[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function refresh() {
+    if (!token) return;
+    api
+      .listBookings(token)
+      .then((data) => {
+        setBookings(data);
+        setError(null);
+      })
+      .catch(() => setError("Could not load your bookings."));
+  }
+
+  useEffect(refresh, [token]);
+
+  function update(updated: Booking) {
+    setBookings((prev) => (prev ? prev.map((x) => (x.id === updated.id ? updated : x)) : prev));
+  }
+
+  // Lazy initializer runs once at mount, not on every render — the
+  // sanctioned way to read a wall-clock value from a React component body.
+  const [now] = useState(() => Date.now());
+  const upcoming = (bookings ?? [])
+    .filter((b) => b.status === "CONFIRMED" && new Date(b.starts_at).getTime() >= now)
+    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+  const past = (bookings ?? []).filter((b) => !upcoming.includes(b));
+
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col gap-8">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">My bookings</h1>
+        <p className="mt-1 text-sm text-foreground/60">Real time-slot bookings with a QR ticket for check-in.</p>
+      </div>
+      {error && <ErrorState title={error} onRetry={refresh} />}
+      {bookings === null && !error && (
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="animate-pulse rounded-2xl border border-border bg-surface p-5">
+              <div className="h-4 w-1/2 rounded bg-surface-muted" />
+              <div className="mt-2 h-3 w-1/3 rounded bg-surface-muted" />
+            </div>
+          ))}
+        </div>
+      )}
+      {bookings?.length === 0 && (
+        <EmptyState
+          icon={<TicketIcon width={28} height={28} />}
+          title="No bookings yet."
+          action={
+            <Link href="/businesses" className="text-sm font-medium text-primary">
+              Browse businesses
+            </Link>
+          }
+        />
+      )}
+      {bookings && bookings.length > 0 && (
+        <>
+          {upcoming.length > 0 && (
+            <div>
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-foreground/50">Upcoming</h2>
+              <ul className="flex flex-col gap-3">
+                {upcoming.map((b) => (
+                  <BookingCard key={b.id} booking={b} onCancelled={update} />
+                ))}
+              </ul>
+            </div>
+          )}
+          {past.length > 0 && (
+            <div>
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-foreground/50">Past & other</h2>
+              <ul className="flex flex-col gap-3">
+                {past.map((b) => (
+                  <BookingCard key={b.id} booking={b} onCancelled={update} />
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function BookingsPage() {
+  return (
+    <RequireAuth>
+      <BookingsList />
+    </RequireAuth>
+  );
+}

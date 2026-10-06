@@ -1,0 +1,187 @@
+@import "tailwindcss";
+
+/*
+ * TravIndi visual language — "heritage" palette: stone-cream ground, deep
+ * ink-navy for text and intentionally dark sections, terracotta primary and
+ * teal accent (India's built heritage + calm/trust), gold reserved for
+ * accents on dark ink surfaces. Marcellus for display headings, Manrope for
+ * body/UI — matches the approved SIH 26204 design direction.
+ */
+:root {
+  --background: #f5efe3;
+  --foreground: #0e2942;
+  --surface: #ffffff;
+  --surface-muted: #efe7d6;
+  --border: rgba(14, 41, 66, 0.12);
+  --primary: #b76a32;
+  --primary-foreground: #fbf3e7;
+  --accent: #1e806d;
+  --accent-foreground: #ffffff;
+  --muted: #6d7e8c;
+  --danger: #d94e4e;
+  --success: #3f7e56;
+  --ink: #081a2f;
+  --ink-2: #0e2942;
+  --gold: #d9b56d;
+
+  /* Radius scale — three stops cover every real shape in this app: a
+     small control (chip/input), a card, and a full pill. Nothing here
+     needed a fourth stop once cards/inputs/pills were named explicitly. */
+  --radius-control: 0.5rem;
+  --radius-card: 1rem;
+  --radius-pill: 999px;
+
+  /* Elevation scale — "resting" (a card sitting on the page background)
+     vs "raised" (a popover/dropdown/modal above other content). Most of
+     this app deliberately uses borders instead of shadows for
+     separation (see §13 card discipline); these two stops exist for the
+     real cases that need to visually lift off the page. */
+  --shadow-resting: 0 1px 2px rgba(14, 41, 66, 0.06);
+  --shadow-raised: 0 12px 32px -8px rgba(14, 41, 66, 0.22);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-gold: var(--gold);
+  --font-sans: var(--font-manrope);
+  --font-display: var(--font-marcellus);
+  --font-mono: var(--font-geist-mono);
+  --radius-control: var(--radius-control);
+  --radius-card: var(--radius-card);
+  --radius-pill: var(--radius-pill);
+  --shadow-resting: var(--shadow-resting);
+  --shadow-raised: var(--shadow-raised);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #081a2f;
+    --foreground: #f5efe3;
+    --surface: #0e2942;
+    --surface-muted: #123356;
+    --border: rgba(217, 181, 109, 0.22);
+    --primary: #d9b56d;
+    --primary-foreground: #081a2f;
+    --accent: #2dae95;
+    --accent-foreground: #081a2f;
+    --muted: #9fb0be;
+    --danger: #ff8a8a;
+    --success: #74d19a;
+  }
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: rgba(183, 106, 50, 0.25);
+}
+
+/* A physical "press" on every real button site-wide — the one micro-
+   interaction class of feedback that was entirely missing (only :hover
+   existed anywhere). Purely visual, so it layers safely under whatever
+   hover transform a button already has; reduced-motion zeroes the
+   transition duration via the wildcard rule below, same as everything
+   else. Excludes disabled buttons — a press-down on something inert
+   would read as a lie about what just happened. */
+button:not(:disabled) {
+  transition: transform 0.1s ease;
+}
+button:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.35s ease-out both;
+}
+
+/* The image treatment used across hero/decorative photography — desaturated
+   and lifted slightly so it sits back into the warm page. Positioning is
+   left to the caller's own utility classes (e.g. `relative`/`absolute`). */
+.washed img {
+  filter: saturate(0.85) contrast(0.96);
+}
+
+/*
+ * Real accessibility preferences (FR-22) — applied as data-attributes on
+ * <html> by src/lib/accessibility-context.tsx, not just a stored-but-unused
+ * setting. High contrast overrides the palette with a true black/white/
+ * yellow scheme (WCAG AAA-oriented contrast, not just "darker"); large
+ * text scales the whole document; reduced motion turns off every
+ * transition/animation site-wide, including ones added later.
+ */
+[data-a11y-high-contrast="true"] {
+  --background: #000000;
+  --foreground: #ffffff;
+  --surface: #0a0a0a;
+  --surface-muted: #1a1a1a;
+  --border: rgba(255, 255, 255, 0.6);
+  --primary: #ffd60a;
+  --primary-foreground: #000000;
+  --accent: #5ee1ff;
+  --accent-foreground: #000000;
+  --muted: #d4d4d4;
+  --danger: #ff6b6b;
+  --success: #6bff8f;
+}
+
+[data-a11y-large-text="true"] {
+  font-size: 118%;
+}
+
+[data-a11y-reduce-motion="true"] *,
+[data-a11y-reduce-motion="true"] *::before,
+[data-a11y-reduce-motion="true"] *::after {
+  animation-duration: 0.001s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0.001s !important;
+  scroll-behavior: auto !important;
+}
